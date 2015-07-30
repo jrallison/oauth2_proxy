@@ -38,7 +38,7 @@ type Options struct {
 	CookieHttpOnly bool          `flag:"cookie-httponly" cfg:"cookie_httponly"`
 
 	Upstreams         []string          `flag:"upstream" cfg:"upstreams"`
-	UpstreamMap       map[string]string `flag:"upstream-map" cfg:"upstreams_map"`
+	UpstreamMap       map[string]string `cfg:"upstream_map"`
 	SkipAuthRegex     []string          `flag:"skip-auth-regex" cfg:"skip_auth_regex"`
 	PassBasicAuth     bool              `flag:"pass-basic-auth" cfg:"pass_basic_auth"`
 	BasicAuthPassword string            `flag:"basic-auth-password" cfg:"basic_auth_password"`
@@ -78,6 +78,7 @@ func NewOptions() *Options {
 		PassAccessToken:     false,
 		PassHostHeader:      true,
 		RequestLogging:      true,
+		UpstreamMap:         make(map[string]string),
 	}
 }
 
