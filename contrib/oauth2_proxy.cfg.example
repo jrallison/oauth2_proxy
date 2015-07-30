@@ -17,6 +17,10 @@
 # upstreams = [
 #     "http://127.0.0.1:8080/"
 # ]
+#
+# [upstreams_map]
+# "/prefix" = "http://127.0.0.1:8080"
+# "/other" = "http://127.0.0.1:8081/path"
 
 ## Log requests to stdout
 # request_logging = true

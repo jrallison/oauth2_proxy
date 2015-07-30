@@ -11,7 +11,7 @@ import (
 
 func testOptions() *Options {
 	o := NewOptions()
-	o.Upstreams = append(o.Upstreams, "http://127.0.0.1:8080/")
+	o.Upstreams = append(o.Upstreams, "http://127.0.0.1:8080")
 	o.CookieSecret = "foobar"
 	o.ClientID = "bazquux"
 	o.ClientSecret = "xyzzyplugh"
@@ -56,16 +56,30 @@ func TestRedirectUrl(t *testing.T) {
 	assert.Equal(t, expected, o.redirectUrl)
 }
 
-func TestProxyUrls(t *testing.T) {
+func TestProxyUpstreams(t *testing.T) {
 	o := testOptions()
-	o.Upstreams = append(o.Upstreams, "http://127.0.0.1:8081")
+	o.Upstreams = append(o.Upstreams, "http://127.0.0.1:8081/abc")
 	assert.Equal(t, nil, o.Validate())
-	expected := []*url.URL{
-		&url.URL{Scheme: "http", Host: "127.0.0.1:8080", Path: "/"},
-		// note the '/' was added
-		&url.URL{Scheme: "http", Host: "127.0.0.1:8081", Path: "/"},
+	expected := map[string]*url.URL{
+		"/":    &url.URL{Scheme: "http", Host: "127.0.0.1:8080", Path: "/"},
+		"/abc": &url.URL{Scheme: "http", Host: "127.0.0.1:8081", Path: "/abc"},
 	}
-	assert.Equal(t, expected, o.proxyUrls)
+	assert.Equal(t, expected, o.proxyMap)
+}
+
+func TestProxyUpstreamMap(t *testing.T) {
+	o := testOptions()
+	o.UpstreamMap = map[string]string{
+		"/abc":  "http://127.0.0.1:8081",
+		"/123/": "http://127.0.0.1:8081/456",
+	}
+	assert.Equal(t, nil, o.Validate())
+	expected := map[string]*url.URL{
+		"/":     &url.URL{Scheme: "http", Host: "127.0.0.1:8080", Path: "/"},
+		"/abc":  &url.URL{Scheme: "http", Host: "127.0.0.1:8081", Path: "/"},
+		"/123/": &url.URL{Scheme: "http", Host: "127.0.0.1:8081", Path: "/456"},
+	}
+	assert.Equal(t, expected, o.proxyMap)
 }
 
 func TestCompiledRegex(t *testing.T) {

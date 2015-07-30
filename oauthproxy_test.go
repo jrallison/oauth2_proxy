@@ -2,8 +2,6 @@ package main
 
 import (
 	"encoding/base64"
-	"github.com/bitly/oauth2_proxy/providers"
-	"github.com/bmizerany/assert"
 	"io/ioutil"
 	"log"
 	"net"
@@ -14,6 +12,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/bitly/oauth2_proxy/providers"
+	"github.com/bmizerany/assert"
 )
 
 func init() {
@@ -70,6 +71,46 @@ func TestEncodedSlashes(t *testing.T) {
 	}
 	if seen != encodedPath {
 		t.Errorf("got bad request %q expected %q", seen, encodedPath)
+	}
+}
+
+func TestNewOauthProxyMux(t *testing.T) {
+	var seen string
+
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		seen = r.RequestURI
+	}))
+	defer backend.Close()
+
+	var tests = []struct {
+		config map[string]string
+		req    string
+		result string
+	}{
+		{map[string]string{"/abc": backend.URL}, "/abc/def", "/def"},
+		{map[string]string{"/abc": backend.URL + "/123"}, "/abc/def", "/123/def"},
+		{map[string]string{"/abc": backend.URL + "/abc"}, "/abc/def", "/abc/def"},
+		{map[string]string{"/abc": backend.URL}, "/abc/", "/"},
+	}
+
+	for i, test := range tests {
+		seen = ""
+
+		opts := NewOptions()
+		opts.UpstreamMap = test.config
+		opts.Validate()
+
+		proxy := NewOauthProxy(opts, func(string) bool { return true })
+
+		rw := httptest.NewRecorder()
+		req, _ := http.NewRequest("GET", test.req, nil)
+
+		proxy.serveMux.ServeHTTP(rw, req)
+
+		if seen != test.result || rw.Code != 200 {
+			t.Errorf("Case %d: Incorrect proxy result for %s. Wanted: %s %d, Got: %s %d", i, test.req, test.result, 200, seen, rw.Code)
+		}
 	}
 }
 

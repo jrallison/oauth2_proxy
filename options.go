@@ -37,12 +37,13 @@ type Options struct {
 	CookieSecure   bool          `flag:"cookie-secure" cfg:"cookie_secure"`
 	CookieHttpOnly bool          `flag:"cookie-httponly" cfg:"cookie_httponly"`
 
-	Upstreams         []string `flag:"upstream" cfg:"upstreams"`
-	SkipAuthRegex     []string `flag:"skip-auth-regex" cfg:"skip_auth_regex"`
-	PassBasicAuth     bool     `flag:"pass-basic-auth" cfg:"pass_basic_auth"`
-	BasicAuthPassword string   `flag:"basic-auth-password" cfg:"basic_auth_password"`
-	PassAccessToken   bool     `flag:"pass-access-token" cfg:"pass_access_token"`
-	PassHostHeader    bool     `flag:"pass-host-header" cfg:"pass_host_header"`
+	Upstreams         []string          `flag:"upstream" cfg:"upstreams"`
+	UpstreamMap       map[string]string `flag:"upstream-map" cfg:"upstreams_map"`
+	SkipAuthRegex     []string          `flag:"skip-auth-regex" cfg:"skip_auth_regex"`
+	PassBasicAuth     bool              `flag:"pass-basic-auth" cfg:"pass_basic_auth"`
+	BasicAuthPassword string            `flag:"basic-auth-password" cfg:"basic_auth_password"`
+	PassAccessToken   bool              `flag:"pass-access-token" cfg:"pass_access_token"`
+	PassHostHeader    bool              `flag:"pass-host-header" cfg:"pass_host_header"`
 
 	// These options allow for other providers besides Google, with
 	// potential overrides.
@@ -57,7 +58,7 @@ type Options struct {
 
 	// internal values that are set after config validation
 	redirectUrl   *url.URL
-	proxyUrls     []*url.URL
+	proxyMap      map[string]*url.URL
 	CompiledRegex []*regexp.Regexp
 	provider      providers.Provider
 }
@@ -91,7 +92,7 @@ func parseUrl(to_parse string, urltype string, msgs []string) (*url.URL, []strin
 
 func (o *Options) Validate() error {
 	msgs := make([]string, 0)
-	if len(o.Upstreams) < 1 {
+	if len(o.Upstreams) < 1 && len(o.UpstreamMap) < 1 {
 		msgs = append(msgs, "missing setting: upstream")
 	}
 	if o.CookieSecret == "" {
@@ -109,6 +110,8 @@ func (o *Options) Validate() error {
 
 	o.redirectUrl, msgs = parseUrl(o.RedirectUrl, "redirect", msgs)
 
+	o.proxyMap = make(map[string]*url.URL)
+
 	for _, u := range o.Upstreams {
 		upstreamUrl, err := url.Parse(u)
 		if err != nil {
@@ -116,10 +119,33 @@ func (o *Options) Validate() error {
 				"error parsing upstream=%q %s",
 				upstreamUrl, err))
 		}
+
 		if upstreamUrl.Path == "" {
 			upstreamUrl.Path = "/"
 		}
-		o.proxyUrls = append(o.proxyUrls, upstreamUrl)
+
+		o.proxyMap[upstreamUrl.Path] = upstreamUrl
+	}
+
+	for path, u := range o.UpstreamMap {
+		upstreamUrl, err := url.Parse(u)
+		if err != nil {
+			msgs = append(msgs, fmt.Sprintf(
+				"error parsing upstream hash %s=%q %s",
+				path, upstreamUrl, err))
+		}
+
+		if upstreamUrl.Path == "" {
+			upstreamUrl.Path = "/"
+		}
+
+		if !strings.HasPrefix(path, "/") {
+			msgs = append(msgs, fmt.Sprintf(
+				"error parsing upstream hash %s=%q %s",
+				path, upstreamUrl, "proxy path must be absolute (start with a '/')"))
+		}
+
+		o.proxyMap[path] = upstreamUrl
 	}
 
 	for _, u := range o.SkipAuthRegex {

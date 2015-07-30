@@ -51,12 +51,14 @@ type OauthProxy struct {
 }
 
 type UpstreamProxy struct {
+	prefix   string
 	upstream string
 	handler  http.Handler
 }
 
 func (u *UpstreamProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("GAP-Upstream-Address", u.upstream)
+	r.URL.Path = strings.Replace(r.URL.Path, u.prefix, "", 1)
 	u.handler.ServeHTTP(w, r)
 }
 
@@ -85,17 +87,21 @@ func setProxyDirector(proxy *httputil.ReverseProxy) {
 
 func NewOauthProxy(opts *Options, validator func(string) bool) *OauthProxy {
 	serveMux := http.NewServeMux()
-	for _, u := range opts.proxyUrls {
-		path := u.Path
-		u.Path = ""
+	for path, u := range opts.proxyMap {
+		if !strings.HasSuffix(path, "/") {
+			path = path + "/"
+		}
+
 		log.Printf("mapping path %q => upstream %q", path, u)
+
 		proxy := NewReverseProxy(u)
 		if !opts.PassHostHeader {
 			setProxyUpstreamHostHeader(proxy, u)
 		} else {
 			setProxyDirector(proxy)
 		}
-		serveMux.Handle(path, &UpstreamProxy{u.Host, proxy})
+
+		serveMux.Handle(path, &UpstreamProxy{path, u.Host, proxy})
 	}
 	for _, u := range opts.CompiledRegex {
 		log.Printf("compiled skip-auth-regex => %q", u)
